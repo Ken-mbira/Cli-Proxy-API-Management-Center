@@ -17,6 +17,8 @@ export type ProviderTabsProps = {
   active: string;
   resolvedTheme: ResolvedTheme;
   onChange: (type: string) => void;
+  /** Underline is the auth-files default. Quota uses filled pills. */
+  variant?: 'underline' | 'pills';
 };
 
 /**
@@ -29,6 +31,7 @@ export function ProviderTabs({
   active,
   resolvedTheme,
   onChange,
+  variant = 'underline',
 }: ProviderTabsProps) {
   const { t } = useTranslation();
   const tabsRef = useRef<HTMLDivElement>(null);
@@ -43,7 +46,12 @@ export function ProviderTabs({
   }, []);
 
   return (
-    <div ref={tabsRef} className={styles.tabs} role="group" aria-label={t('auth_files.filter_all')}>
+    <div
+      ref={tabsRef}
+      className={variant === 'pills' ? `${styles.tabs} ${styles.pills}` : styles.tabs}
+      role="group"
+      aria-label={t('auth_files.filter_all')}
+    >
       {types.map((type) => {
         const isActive = active === type;
         const label = type === 'all' ? t('auth_files.filter_all') : getTypeLabel(t, type);

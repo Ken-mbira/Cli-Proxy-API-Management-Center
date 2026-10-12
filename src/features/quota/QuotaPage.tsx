@@ -13,7 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { authFilesApi } from '@/services/api';
 import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
-import { IconSearch, IconX } from '@/components/ui/icons';
+import { IconRefreshCw, IconSearch, IconX } from '@/components/ui/icons';
 import { Select } from '@/components/ui/Select';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
@@ -22,9 +22,13 @@ import { useRevealGroup } from '@/hooks/motion';
 import { useAuthStore, useQuotaStore, useThemeStore } from '@/stores';
 import type { AuthFileItem, ResolvedTheme } from '@/types';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
+import {
+  getAuthFileIcon,
+  getTypeLabel,
+} from '@/features/authFiles/constants';
 import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
-import { QuotaHeader } from './components/QuotaHeader';
 import { QuotaCard } from './components/QuotaCard';
+import { QuotaSummary } from './components/QuotaSummary';
 import { QuotaTimeline } from './components/QuotaTimeline';
 import {
   CARD_ENTRANCE_BUDGET_MS,
@@ -301,6 +305,17 @@ export function QuotaPage() {
 
   const canUseActions = !disableControls && !loading && filesGeneration === sessionGeneration;
 
+  const autoLoadedKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!canUseActions || batchLoading || pageItems.length === 0) return;
+    const idle = pageItems.filter((entry) => (getQuota(entry)?.status ?? 'idle') === 'idle');
+    if (idle.length === 0) return;
+    const key = idle.map((entry) => `${entry.type}:${getQuotaCacheKey(entry.file)}`).join('|');
+    if (autoLoadedKeyRef.current === key) return;
+    autoLoadedKeyRef.current = key;
+    void loadQuota(idle);
+  }, [batchLoading, canUseActions, getQuota, loadQuota, pageItems]);
+
   /* ---------- 首屏卡片一次性级联入场 ----------
    * 首批数据渲染后立即翻转 cardsAnimated；已挂载的卡片在挂载时捕获过自己的
    * 延迟（QuotaCard 内 useState 初始化），后续切 tab/翻页/刷新新挂载的卡片
@@ -313,6 +328,20 @@ export function QuotaPage() {
       setCardsAnimated(true);
     }
   }, [enableCardEntrance]);
+  const groups = useMemo(() => {
+    const order: QuotaFileEntry['type'][] = [];
+    const grouped = new Map<QuotaFileEntry['type'], QuotaFileEntry[]>();
+    pageItems.forEach((entry) => {
+      const bucket = grouped.get(entry.type);
+      if (bucket) bucket.push(entry);
+      else {
+        grouped.set(entry.type, [entry]);
+        order.push(entry.type);
+      }
+    });
+    return order.map((type) => ({ type, entries: grouped.get(type) ?? [] }));
+  }, [pageItems]);
+
   const cardEntranceDelay = (index: number): number | null => {
     if (!enableCardEntrance) return null;
     if (pageItems.length <= 1) return 0;
@@ -325,15 +354,6 @@ export function QuotaPage() {
 
   return (
     <div className={styles.page} ref={revealRef}>
-      <QuotaHeader
-        totalCount={entries.length}
-        loadedCount={loadedCount}
-        attentionCount={attentionCount}
-        refreshing={loading || batchLoading}
-        disableControls={disableControls}
-        onRefreshAll={handleRefreshAll}
-      />
-
       <section className={styles.workbench}>
         {/* 提供商导航与搜索工具栏分层，避免不同控件争夺视觉焦点。 */}
         <div className={styles.tabsRow} data-reveal>
@@ -343,6 +363,7 @@ export function QuotaPage() {
             active={tab}
             resolvedTheme={resolvedTheme}
             onChange={handleTabChange}
+            variant="pills"
           />
         </div>
 
@@ -382,7 +403,29 @@ export function QuotaPage() {
               size="sm"
             />
           </div>
+          <button
+            type="button"
+            className={styles.refreshAll}
+            onClick={handleRefreshAll}
+            disabled={disableControls || loading || batchLoading}
+            title={
+              attentionCount > 0
+                ? t('quota_management.meta_attention', { count: attentionCount })
+                : t('quota_management.meta_loaded', { count: loadedCount })
+            }
+          >
+            <IconRefreshCw size={14} className={loading || batchLoading ? styles.spinning : undefined} />
+            {t('quota_management.refresh_all_credentials')}
+          </button>
         </div>
+
+        {!loading && !isEmpty && (
+          <QuotaSummary
+            entries={filteredEntries}
+            quotaFor={getQuota}
+            resolvedTheme={resolvedTheme}
+          />
+        )}
 
         {error && (
           <div className={styles.errorBanner} role="alert">
@@ -425,20 +468,38 @@ export function QuotaPage() {
             }
           />
         ) : (
-          <div className={styles.grid}>
-            {pageItems.map((entry, index) => (
-              <QuotaCard
-                key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
-                entry={entry}
-                quota={getQuota(entry)}
-                resolvedTheme={resolvedTheme}
-                canRefresh={canUseActions && !entry.file.disabled}
-                resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
-                entranceDelayMs={cardEntranceDelay(index)}
-                onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-                onReset={() => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-              />
-            ))}
+          <div className={styles.groups}>
+            {groups.map((group) => {
+              const iconSrc = getAuthFileIcon(group.type, resolvedTheme);
+              const label = getTypeLabel(t, group.type);
+              return (
+                <section key={group.type} className={styles.group}>
+                  <h2 className={styles.groupTitle}>
+                    {iconSrc && <img src={iconSrc} alt="" className={styles.groupIcon} />}
+                    <span>{label}</span>
+                    <span className={styles.groupCount}>{group.entries.length}</span>
+                  </h2>
+                  <div className={styles.rows}>
+                    {group.entries.map((entry) => {
+                      const index = pageItems.indexOf(entry);
+                      return (
+                        <QuotaCard
+                          key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
+                          entry={entry}
+                          quota={getQuota(entry)}
+                          resolvedTheme={resolvedTheme}
+                          canRefresh={canUseActions && !entry.file.disabled}
+                          resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
+                          entranceDelayMs={cardEntranceDelay(index)}
+                          onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+                          onReset={() => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+                        />
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })}
           </div>
         )}
 

@@ -14,34 +14,35 @@
 /* ---------- 额度行 ---------- */
 
 .quotaRow {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'model percent'
+    'bar bar'
+    'reset reset';
+  column-gap: 12px;
+  row-gap: 6px;
+  flex: 1 1 180px;
+  max-width: 280px;
+  min-width: 150px;
 }
 
 .quotaRowHeader {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
+  display: contents;
 }
 
 .quotaModel {
+  grid-area: model;
   min-width: 0;
   font-size: 12.5px;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text-secondary);
   @include text-ellipsis;
 }
 
 /* 遥测：mono + 等宽数字，刷新时数字不跳位 */
 .quotaMeta {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 7px;
-  flex-shrink: 0;
+  display: contents;
   font-family: $font-mono;
   font-size: 11.5px;
   font-variant-numeric: tabular-nums;
@@ -50,12 +51,21 @@
 
 /* 百分比穿墨色而非填充色 —— 文字不承担状态编码，颜色留给水位条 */
 .quotaPercent {
+  grid-area: percent;
+  justify-self: end;
+  font-family: $font-mono;
+  font-variant-numeric: tabular-nums;
   font-weight: 650;
   color: var(--text-primary);
 }
 
 .quotaReset {
-  color: var(--text-quaternary);
+  grid-area: reset;
+  font-family: $font-mono;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 /* Countdown beside the absolute reset time. The separator is a pseudo-element
@@ -96,7 +106,8 @@
  * percent === null 时宽度为 0 —— 未知不着色。 */
 
 .quotaBar {
-  height: 6px;
+  grid-area: bar;
+  height: 4px;
   border-radius: $radius-full;
   background: color-mix(in srgb, var(--text-primary) 8%, transparent);
   overflow: hidden;
@@ -168,18 +179,19 @@
   color: var(--text-quaternary);
 }
 
-@include mobile {
-  .quotaRowHeader {
-    flex-direction: column;
-    align-items: flex-start;
+/* Dense board: plan badges stay on the auth-file card; the quota row shows the plan under the filename. */
+.metricBoard {
+  .codexPlan,
+  .codexResetCredits,
+  .codexResetCreditsError {
+    display: none;
   }
+}
 
-  .quotaModel {
-    width: 100%;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    overflow-wrap: anywhere;
+@include mobile {
+  .quotaRow {
+    flex-basis: 100%;
+    max-width: none;
   }
 }
 

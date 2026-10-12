@@ -127,6 +127,32 @@
   }
 }
 
+/* Quota page: filled pills, no underline. Auth files keep the default strip. */
+
+.pills {
+  gap: 4px;
+  border-bottom: 0;
+  padding-bottom: 2px;
+
+  .tab {
+    padding: 6px 10px;
+    border-radius: $radius-full;
+
+    &::after {
+      display: none;
+    }
+  }
+
+  .tabActive {
+    background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+  }
+
+  .tabCount {
+    padding: 0;
+    background: transparent;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tab,
   .tab::after {

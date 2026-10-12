@@ -8,17 +8,12 @@
  */
 
 import { useState, type CSSProperties } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { IconRefreshCw } from '@/components/ui/icons';
 import type { ResolvedTheme } from '@/types';
 import { resolveQuotaErrorMessage } from '@/utils/quota';
 import { getQuotaDisplayName } from '@/utils/quota/identity';
-import {
-  getAuthFileIcon,
-  getThemeSurfaceIconBackground,
-  getTypeLabel,
-  isThemeSurfaceIconProvider,
-} from '@/features/authFiles/constants';
 import { bindQuotaClasses } from '../types';
 import { QUOTA_ADAPTERS, type QuotaCardState } from '../providers';
 import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
@@ -29,6 +24,21 @@ import styles from './QuotaCard.module.scss';
 
 /** 额度页全页外衣：QuotaBody 模块绑定成类型化契约（缺键在模块初始化即抛）。 */
 const quotaClasses = bindQuotaClasses(bodyStyles, 'QuotaBody.module.scss');
+
+const planCaption = (
+  type: QuotaFileEntry['type'],
+  quota: QuotaCardState | undefined,
+  t: TFunction
+): string | null => {
+  if (!quota || quota.status !== 'success' || !('planType' in quota)) return null;
+  const planType = quota.planType;
+  if (!planType) return null;
+  if (type === 'claude') return t(`claude_quota.${planType}`, { defaultValue: planType });
+  if (type === 'codex') {
+    return t(`codex_quota.plan_${planType}`, { defaultValue: planType });
+  }
+  return null;
+};
 
 export type QuotaCardProps = {
   entry: QuotaFileEntry;
@@ -43,16 +53,7 @@ export type QuotaCardProps = {
 };
 
 export function QuotaCard(props: QuotaCardProps) {
-  const {
-    entry,
-    quota,
-    resolvedTheme,
-    canRefresh,
-    resetting,
-    entranceDelayMs,
-    onRefresh,
-    onReset,
-  } = props;
+  const { entry, quota, canRefresh, resetting, entranceDelayMs, onRefresh, onReset } = props;
   const { t } = useTranslation();
   const adapter = QUOTA_ADAPTERS[entry.type];
   const file = entry.file;
@@ -74,12 +75,7 @@ export function QuotaCard(props: QuotaCardProps) {
     quota,
     onRefresh
   );
-  const providerType =
-    entry.type === 'plugin'
-      ? String(file.quotaProvider ?? file['quota_provider'] ?? file.provider ?? file.type ?? 'plugin')
-      : entry.type;
-  const iconSrc = getAuthFileIcon(providerType, resolvedTheme);
-  const typeLabel = getTypeLabel(t, providerType);
+  const plan = planCaption(entry.type, quota, t);
   const errorMessage = resolveQuotaErrorMessage(
     t,
     quota?.errorStatus,
@@ -97,27 +93,13 @@ export function QuotaCard(props: QuotaCardProps) {
       style={entranceStyle}
     >
       <header className={styles.head}>
-        <span
-          className={styles.iconWrap}
-          title={typeLabel}
-          style={
-            isThemeSurfaceIconProvider(providerType)
-              ? { background: getThemeSurfaceIconBackground(resolvedTheme) }
-              : undefined
-          }
-        >
-          {iconSrc ? (
-            <img src={iconSrc} alt="" className={styles.icon} />
-          ) : (
-            <span className={styles.iconFallback}>{typeLabel.slice(0, 1).toUpperCase()}</span>
-          )}
-        </span>
         <span className={styles.fileName} title={displayName}>
           {displayName}
         </span>
+        {plan && <span className={styles.planLine}>{plan}</span>}
       </header>
 
-      <div className={styles.body}>
+      <div className={`${styles.body} ${bodyStyles.metricBoard}`}>
         {entry.type === 'claude' && status === 'success' && (
           <>
             <div className={quotaClasses.codexPlan}>
