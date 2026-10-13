@@ -9,9 +9,10 @@
 .card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(168px, 230px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 240px) minmax(0, 1fr) auto;
   gap: 8px 20px;
   align-items: center;
+  min-width: 0;
   padding: 16px 4px;
   border: 0;
   border-bottom: 1px solid color-mix(in srgb, var(--border-color) 85%, transparent);
@@ -43,9 +44,11 @@
 .head {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   gap: 3px;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .planLine {
@@ -79,6 +82,9 @@
 }
 
 .fileName {
+  display: block;
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
   font-family: $font-mono;
   font-size: 12.5px;
